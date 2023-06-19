@@ -5,6 +5,7 @@ require('dotenv').config();
 const { v4: uuidv4 } = require('uuid');
 const stripe = require('stripe')(process.env.PAYMENT_SECRET_KEY)
 const app = express()
+const SSLCommerzPayment = require('sslcommerz-lts')
 const port = process.env.PORT || 5000;
 
 // middleware
@@ -23,6 +24,11 @@ const client = new MongoClient(uri, {
     deprecationErrors: true,
   }
 });
+
+const store_id = process.env.STORE_ID;
+const store_passwd = process.env.STORE_PASS;
+const is_live = false //true for live, false for sandbox
+
 
 async function run() {
   try {
@@ -55,7 +61,7 @@ async function run() {
       const id = req.params.id;
       const update = req.body;
       console.log("class:", id)
-      const filter = { _id: id};
+      const filter = { _id: id };
       console.log(filter)
       const options = { upsert: true };
       const updateSeats = {
@@ -75,7 +81,7 @@ async function run() {
       const result = await classCollection.insertOne(addClass);
       res.send(result);
     })
-    
+
     // user collection
     app.get('/users', async (req, res) => {
       const result = await usersCollection.find().toArray();
@@ -207,12 +213,12 @@ async function run() {
       const selectClass = await selectClassCollection.insertOne(addClass);
       res.send(selectClass);
     });
-    
+
 
     app.delete('/selectClass/:id', async (req, res) => {
       const id = req.params.id;
       console.log(id); // Check the value of `id`
-      const query = { _id: new ObjectId(id)};
+      const query = { _id: new ObjectId(id) };
       const result = await selectClassCollection.deleteOne(query);
       res.send(result);
     });
@@ -221,7 +227,6 @@ async function run() {
     app.post('/create-payment-intent', async (req, res) => {
       const { price } = req.body;
       const amount = price * 100;
-      console.log(price, amount)
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
         currency: 'usd',
@@ -267,6 +272,67 @@ async function run() {
       console.log(query)
       const deleteItems = await selectClassCollection.deleteMany(query)
       res.send({ insertResult, deleteItems });
+    })
+
+    app.get('/admin-status', async (req, res) => {
+      const users = await usersCollection.estimatedDocumentCount();
+      const classes = await classCollection.estimatedDocumentCount();
+      const payments = await paymentCollection.find().toArray();
+      const revenue = payments.reduce((sum, payments) => sum + payments.price, 0)
+      res.send({
+        users,
+        classes,
+        revenue
+      })
+    })
+
+    app.post('/orders', async (req, res) => {
+      const { price } = req.body;
+      const order = req.body;
+
+      const tran_id = new ObjectId().toString();
+      const data = {
+        total_amount: price,
+        currency: order.currency,
+        tran_id: tran_id, // use unique tran_id for each api call
+        success_url: `http://localhost:5000/success/${tran_id}`,
+        fail_url: 'http://localhost:3030/fail',
+        cancel_url: 'http://localhost:3030/cancel',
+        ipn_url: 'http://localhost:3030/ipn',
+        shipping_method: 'Courier',
+        product_name: 'Computer.',
+        product_category: 'Electronic',
+        product_profile: 'general',
+        cus_name: order.userName,
+        cus_email: order.email,
+        cus_add1: 'Dhaka',
+        cus_add2: 'Dhaka',
+        cus_city: 'Dhaka',
+        cus_state: 'Dhaka',
+        cus_postcode: '1000',
+        cus_country: 'Bangladesh',
+        cus_phone: '01711111111',
+        cus_fax: '01711111111',
+        ship_name: 'Customer Name',
+        ship_add1: 'Dhaka',
+        ship_add2: 'Dhaka',
+        ship_city: 'Dhaka',
+        ship_state: 'Dhaka',
+        ship_postcode: 1000,
+        ship_country: 'Bangladesh',
+      };
+      console.log(data)
+      const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live)
+      sslcz.init(data).then(apiResponse => {
+        // Redirect the user to payment gateway
+        let GatewayPageURL = apiResponse.GatewayPageURL
+        res.send({ url: GatewayPageURL })
+        console.log('Redirecting to: ', GatewayPageURL)
+      });
+
+      app.post('/payment/success/:tranId', async (req, res) => {
+        console.log(req.params.id);
+      })
     })
 
     await client.db("admin").command({ ping: 1 });
