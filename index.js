@@ -14,7 +14,7 @@ app.use(express.json());
 
 
 
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.mj9te36.mongodb.net/?retryWrites=true&w=majority`;
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.gixavfk.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -269,7 +269,6 @@ async function run() {
       const payment = req.body;
       const insertResult = await paymentCollection.insertOne(payment);
       const query = { _id: { $in: payment.item.map(id => new ObjectId(id)) } }
-      console.log(query)
       const deleteItems = await selectClassCollection.deleteMany(query)
       res.send({ insertResult, deleteItems });
     })
@@ -286,54 +285,6 @@ async function run() {
       })
     })
 
-    app.post('/orders', async (req, res) => {
-      const { price } = req.body;
-      const order = req.body;
-
-      const tran_id = new ObjectId().toString();
-      const data = {
-        total_amount: price,
-        currency: order.currency,
-        tran_id: tran_id, // use unique tran_id for each api call
-        success_url: `http://localhost:5000/success/${tran_id}`,
-        fail_url: 'http://localhost:3030/fail',
-        cancel_url: 'http://localhost:3030/cancel',
-        ipn_url: 'http://localhost:3030/ipn',
-        shipping_method: 'Courier',
-        product_name: 'Computer.',
-        product_category: 'Electronic',
-        product_profile: 'general',
-        cus_name: order.userName,
-        cus_email: order.email,
-        cus_add1: 'Dhaka',
-        cus_add2: 'Dhaka',
-        cus_city: 'Dhaka',
-        cus_state: 'Dhaka',
-        cus_postcode: '1000',
-        cus_country: 'Bangladesh',
-        cus_phone: '01711111111',
-        cus_fax: '01711111111',
-        ship_name: 'Customer Name',
-        ship_add1: 'Dhaka',
-        ship_add2: 'Dhaka',
-        ship_city: 'Dhaka',
-        ship_state: 'Dhaka',
-        ship_postcode: 1000,
-        ship_country: 'Bangladesh',
-      };
-      console.log(data)
-      const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live)
-      sslcz.init(data).then(apiResponse => {
-        // Redirect the user to payment gateway
-        let GatewayPageURL = apiResponse.GatewayPageURL
-        res.send({ url: GatewayPageURL })
-        console.log('Redirecting to: ', GatewayPageURL)
-      });
-
-      app.post('/payment/success/:tranId', async (req, res) => {
-        console.log(req.params.id);
-      })
-    })
 
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
