@@ -14,8 +14,7 @@ app.use(express.json());
 
 
 
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.gixavfk.mongodb.net/?retryWrites=true&w=majority`;
-
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.botql15.mongodb.net/?retryWrites=true&w=majority`;
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
   serverApi: {
@@ -117,7 +116,7 @@ async function run() {
     app.patch('/users/instructor/:id', async (req, res) => {
       const id = req.params.id;
       console.log(id);
-      const filter = { _id: new ObjectId(id) };
+      const filter = { _id: new ObjectId(id)};
       const updateInstructor = {
         $set: {
           role: 'instructor'
@@ -274,16 +273,25 @@ async function run() {
     })
 
     app.get('/admin-status', async (req, res) => {
-      const users = await usersCollection.estimatedDocumentCount();
-      const classes = await classCollection.estimatedDocumentCount();
-      const payments = await paymentCollection.find().toArray();
-      const revenue = payments.reduce((sum, payments) => sum + payments.price, 0)
-      res.send({
-        users,
-        classes,
-        revenue
-      })
-    })
+      try {
+        const users = await usersCollection.estimatedDocumentCount();
+        const classes = await classCollection.estimatedDocumentCount();
+        const payments = await paymentCollection.find().toArray();
+        
+        const revenue = payments.reduce((sum, payment) => sum + payment.price, 0);
+        
+        res.send({
+          users,
+          classes,
+          revenue
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send('Internal Server Error');
+      }
+    });
+    
+    
 
 
     await client.db("admin").command({ ping: 1 });

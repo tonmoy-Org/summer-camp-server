@@ -1,0 +1,16 @@
+{
+    "name": "Piano",
+    "image": "https://au.yamaha.com/en/files/01_header_yamaha_piano_07d0c9a407953814a503e3c0251e9ae3.jpg?impolicy=resize&imwid=2500&imhei=1448",
+    "instructorName": "Tonmoy-Org",
+    "email": "tonmoy@hasan.com",
+    "availableSeats": {
+        "$numberInt": "37"
+    },
+    "price": {
+        "$numberInt": "500"
+    },
+    "status": "pending",
+    "enrolled": {
+        "$numberInt": "3"
+    }
+}
