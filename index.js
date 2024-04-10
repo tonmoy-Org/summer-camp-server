@@ -2,10 +2,8 @@ const express = require('express')
 const cors = require('cors')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config();
-const { v4: uuidv4 } = require('uuid');
 const stripe = require('stripe')(process.env.PAYMENT_SECRET_KEY)
 const app = express()
-const SSLCommerzPayment = require('sslcommerz-lts')
 const port = process.env.PORT || 5000;
 
 // middleware
@@ -13,8 +11,8 @@ app.use(cors());
 app.use(express.json());
 
 
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.gixavfk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.botql15.mongodb.net/?retryWrites=true&w=majority`;
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
   serverApi: {
@@ -24,9 +22,6 @@ const client = new MongoClient(uri, {
   }
 });
 
-const store_id = process.env.STORE_ID;
-const store_passwd = process.env.STORE_PASS;
-const is_live = false //true for live, false for sandbox
 
 
 async function run() {
@@ -91,7 +86,6 @@ async function run() {
       const user = req.body;
       const query = { email: user.email }
       const existingUser = await usersCollection.findOne(query);
-      console.log(existingUser)
       if (existingUser) {
         return res.send({ message: 'user already exist' })
       }
@@ -116,7 +110,7 @@ async function run() {
     app.patch('/users/instructor/:id', async (req, res) => {
       const id = req.params.id;
       console.log(id);
-      const filter = { _id: new ObjectId(id)};
+      const filter = { _id: new ObjectId(id) };
       const updateInstructor = {
         $set: {
           role: 'instructor'
@@ -158,6 +152,8 @@ async function run() {
       const result = await addClassCollection.find(query).toArray();
       res.send(result);
     })
+
+
     app.get('/addClass', async (req, res) => {
       const result = await addClassCollection.find().toArray();
       res.send(result);
@@ -192,23 +188,26 @@ async function run() {
           feedback: updateInfo.feedback,
         },
       };
-      console.log(updateFeedback)
       const result = await addClassCollection.updateOne(filter, updateFeedback);
       res.send(result)
     })
 
-    app.get('/selectClass', async (req, res) => {
-      let query = {};
-      if (req.query?.email) {
-        query = { email: req.query.email }
-      }
+    app.get('/selectClass/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const result = await selectClassCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    app.get('/selectClass/:id', async (req, res) => {
+      const id = req.params.id
+      const query = { _id: new ObjectId(id) }
       const result = await selectClassCollection.find(query).toArray();
       res.send(result);
     });
 
     app.post('/selectClass', async (req, res) => {
       const addClass = req.body;
-      console.log(addClass);
       const selectClass = await selectClassCollection.insertOne(addClass);
       res.send(selectClass);
     });
@@ -216,7 +215,6 @@ async function run() {
 
     app.delete('/selectClass/:id', async (req, res) => {
       const id = req.params.id;
-      console.log(id); // Check the value of `id`
       const query = { _id: new ObjectId(id) };
       const result = await selectClassCollection.deleteOne(query);
       res.send(result);
@@ -237,27 +235,12 @@ async function run() {
       })
     })
 
-    app.get('/enrolledClass/sort', async (req, res) => {
+    app.get('/enrolledClass', async (req, res) => {
       let query = {};
       if (req.query?.email) {
-        query = { email: req.query.email };
+        query = { email: req.query.email }
       }
-
-      const sortField = req.query?.sortField || 'date'; // Default sort field is 'date'
-      const sortOrder = req.query?.sortOrder || 'asc'; // Default sort order is 'asc'
-
-      const sortOptions = {};
-      if (sortField === 'date') {
-        if (sortOrder === 'desc') {
-          sortOptions['date'] = -1;
-        } else {
-          sortOptions['date'] = 1;
-        }
-      } else {
-        sortOptions[sortField] = sortOrder === 'desc' ? -1 : 1;
-      }
-
-      const result = await paymentCollection.find(query).sort(sortOptions).toArray();
+      const result = await paymentCollection.find(query).toArray();
       res.send(result);
     });
 
@@ -277,9 +260,7 @@ async function run() {
         const users = await usersCollection.estimatedDocumentCount();
         const classes = await classCollection.estimatedDocumentCount();
         const payments = await paymentCollection.find().toArray();
-        
         const revenue = payments.reduce((sum, payment) => sum + payment.price, 0);
-        
         res.send({
           users,
           classes,
@@ -290,8 +271,26 @@ async function run() {
         res.status(500).send('Internal Server Error');
       }
     });
-    
-    
+
+    app.get('/instructor-status/:email', async (req, res) => {
+      const email = req.params.email;
+      try {
+        const [approvedClass, addClass] = await Promise.all([
+          addClassCollection.countDocuments({ email: email, status: 'approved' }),
+          addClassCollection.countDocuments({ email: email }),
+        ]);
+        res.send({
+          approvedClass,
+          addClass
+        });
+      } catch (error) {
+        console.error('Error fetching details:', error);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
+
+
+
 
 
     await client.db("admin").command({ ping: 1 });
